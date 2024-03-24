@@ -67,9 +67,10 @@ func process(line []byte) {
 
 func readContents(path string) {
 	file, _ := os.Open(path)
-	var lineStart, lineEnd, n int
+	var lineStart, lineEnd, n, batchSize int
 	var tail int
 	buffer := make([]byte, readBufferSize)
+	batch := make([][120]byte, 10000)
 	n, _ = file.Read(buffer)
 	for n > 0 {
 		for tail = 0; buffer[n-tail-1] != '\n'; tail++ {
@@ -78,7 +79,12 @@ func readContents(path string) {
 		for lineStart = 0; lineStart < n-tail; {
 			for lineEnd = lineStart; buffer[lineEnd] != '\n'; lineEnd++ {
 			}
-			process(buffer[lineStart:lineEnd])
+			copy(batch[batchSize][:], buffer[lineStart:lineEnd])
+			batchSize++
+			for batchSize > 0 {
+				process(batch[batchSize][:])
+				batchSize--
+			}
 			lineStart = lineEnd + 1
 		}
 
