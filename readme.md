@@ -33,3 +33,9 @@ Sparse set
     Where the sparse array is used to direct index the next node.
 
     - 87.14s user 1.63s system 100% cpu 1:28.72 total
+## Regular Trie (no sparse set)
+    - 60.77s user 1.70s system 100% cpu 1:02.45 total
+    - 60.55s user 1.77s system 99% cpu 1:02.34 total # updated Get
+    - 46.39s user 1.73s system 100% cpu 48.002 total # With TrieNode pool
+    - 48.77s user 1.64s system 99% cpu 50.414 total  # Removed IsValueNode and made Station a pointer
+    - 46.35s user 1.65s system 100% cpu 47.983 total # Value Station instead of pointer

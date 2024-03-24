@@ -87,13 +87,13 @@ func TestTrie(t *testing.T) {
 	root := logic.NewTrie()
 	station1 := root.Get([]byte{'H', 'E', 'Y'})
 	assert.NotNil(t, station1)
-	assert.NotNil(t, root.Root.ChildrenDense[1])
-	assert.NotNil(t, root.Root.ChildrenDense[1].ChildrenDense[1])
-	assert.NotNil(t, root.Root.ChildrenDense[1].ChildrenDense[1].ChildrenDense[1])
+	assert.NotNil(t, root.Root.Children[1])
+	assert.NotNil(t, root.Root.Children[1].Children[1])
+	assert.NotNil(t, root.Root.Children[1].Children[1].Children[1])
 
 	station2 := root.Get([]byte{'H', 'E', 'Z'})
 	assert.NotEqual(t, station1, station2)
-	assert.NotNil(t, root.Root.ChildrenDense[1])
+	assert.NotNil(t, root.Root.Children[1])
 	// Only with 0 terminated
 	// assert.NotNil(t, root.Root.ChildrenDense[0].ChildrenDense[0].ChildrenDense[0].ChildrenDense[0])
 }

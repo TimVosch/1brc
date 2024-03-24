@@ -153,25 +153,25 @@ func ParseTemperature(str []byte) int16 {
 type TrieChildren [0xff]*TrieNode
 
 type TrieNode struct {
-	Parent         *TrieNode
-	ChildrenDense  TrieChildren
-	ChildrenSparse [0xff]uint8
-	NextIndex      uint8
-	IsValueNode    bool
-	Value          Station
+	Parent   *TrieNode
+	Children TrieChildren
+	Value    Station
 }
 
 type Trie struct {
-	Root TrieNode
+	Root         TrieNode
+	pool         []TrieNode
+	nextFromPool int
 }
 
 func NewTrie() *Trie {
-	return &Trie{
+	trie := &Trie{
 		Root: TrieNode{
-			Parent:    nil,
-			NextIndex: 1,
+			Parent: nil,
 		},
 	}
+	trie.pool = make([]TrieNode, 100000)
+	return trie
 }
 
 func (trie *Trie) Get(name []byte) *Station {
@@ -182,23 +182,19 @@ func (trie *Trie) Get(name []byte) *Station {
 	node := &trie.Root
 	for {
 		key = name[nameIndex]
-		next = node.ChildrenDense[node.ChildrenSparse[key]]
+		next = node.Children[key]
+		if next == nil {
+			next = &trie.pool[trie.nextFromPool]
+			trie.nextFromPool++
+			next.Parent = node
+			if nameIndex == nameLength-1 {
+				next.Value.Name = string(name)
+			}
+			node.Children[key] = next
+		}
 
 		// Our name ends so the next node must be(come) our value node
 		if nameIndex == nameLength-1 || key == 0 {
-			if next == nil {
-				next = &TrieNode{
-					Parent: node,
-					Value: Station{
-						Name: string(name),
-					},
-					IsValueNode: true,
-					NextIndex:   1,
-				}
-				node.ChildrenDense[node.NextIndex] = next
-				node.ChildrenSparse[key] = node.NextIndex
-				node.NextIndex++
-			}
 			// TODO: It might happen that a name is part of a bigger name, but a different
 			// city, therefor we MUST check if the existing next is not a value node yet
 			// ie (next != nil && !next.IsEnd)
@@ -206,33 +202,20 @@ func (trie *Trie) Get(name []byte) *Station {
 		}
 
 		// Not returned yet, and next exists so continue traversing
-		if next != nil {
-			node = next
-			nameIndex++
-			continue
-		}
-
-		// Next does not exist, complete the path
-		next = &TrieNode{
-			Parent:    node,
-			NextIndex: 1,
-		}
-		node.ChildrenDense[node.NextIndex] = next
-		node.ChildrenSparse[key] = node.NextIndex
-		node.NextIndex++
 		node = next
 		nameIndex++
 	}
 }
 
 func (node *TrieNode) Items(out chan<- *Station) {
-	for i := uint8(1); i < node.NextIndex; i++ {
-		child := node.ChildrenDense[i]
-		if child.IsValueNode {
-			out <- &child.Value
-		} else {
-			child.Items(out)
+	for _, child := range node.Children {
+		if child == nil {
+			continue
 		}
+		if child.Value.Count != 0 {
+			out <- &child.Value
+		}
+		child.Items(out)
 	}
 }
 
