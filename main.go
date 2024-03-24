@@ -55,52 +55,17 @@ type Station struct {
 }
 
 const (
-	readBufferSize    = 1 << 24
-	maxInLinesChannel = 100
-	maxLineLength     = 110 // 100 name + 1 ; + 1 \n + 5 -12.3
-	batchSize         = 100
-)
-
-type (
-	Payload []byte
-	Batch   [batchSize]Payload
+	readBufferSize = 1 << 24
+	maxLineLength  = 110 // 100 name + 1 ; + 1 \n + 5 -12.3
 )
 
 var (
 	stations     = make(map[string]Station, 10000)
 	stationNames = make([]string, 10000)
-	linesChannel = make(chan *[]byte, maxInLinesChannel)
 )
 
 func Run() error {
-	go readContents()
-
-	// Process
-	for {
-		line, ok := <-linesChannel
-		if !ok {
-			break
-		}
-		stationNameB, temperatureString := Cut((*line)[:])
-		stationName := string(stationNameB)
-		temperature := ParseTemperature(temperatureString)
-		station, ok := stations[stationName]
-		if !ok {
-			station = Station{
-				Min:   temperature,
-				Max:   temperature,
-				Total: temperature,
-				Count: 1,
-			}
-		} else {
-			station.Count++
-			station.Total += temperature
-
-			station.Min = Min(station.Min, temperature)
-			station.Max = Max(station.Max, temperature)
-		}
-		stations[stationName] = station
-	}
+	readContents()
 
 	// Sort stationNames
 	ix := 0
@@ -125,6 +90,28 @@ func Run() error {
 	return nil
 }
 
+func process(line []byte) {
+	stationNameB, temperatureString := Cut(line)
+	stationName := string(stationNameB)
+	temperature := ParseTemperature(temperatureString)
+	station, ok := stations[stationName]
+	if !ok {
+		station = Station{
+			Min:   temperature,
+			Max:   temperature,
+			Total: temperature,
+			Count: 1,
+		}
+	} else {
+		station.Count++
+		station.Total += temperature
+
+		station.Min = Min(station.Min, temperature)
+		station.Max = Max(station.Max, temperature)
+	}
+	stations[stationName] = station
+}
+
 func readContents() {
 	file, _ := os.Open(*measurementsPath)
 	var lineStart, lineEnd, n int
@@ -138,9 +125,7 @@ func readContents() {
 		for lineStart = 0; lineStart < n-tail; {
 			for lineEnd = lineStart; buffer[lineEnd] != '\n'; lineEnd++ {
 			}
-			line := make([]byte, lineEnd-lineStart)
-			copy(line[:], buffer[lineStart:lineEnd])
-			linesChannel <- &line
+			process(buffer[lineStart:lineEnd])
 			lineStart = lineEnd + 1
 		}
 
@@ -149,7 +134,6 @@ func readContents() {
 		n += tail
 	}
 	file.Close()
-	close(linesChannel)
 }
 
 func Cut(line []byte) ([]byte, []byte) {

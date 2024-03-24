@@ -15,3 +15,5 @@
     - 166.71s user 7.35s system 103% cpu 2:48.49 total
     After implementing ramdisk
     - 156.51s user 8.56s system 102% cpu 2:40.32 total
+## Custom batch reader implementation
+    - 82.12s user 3.40s system 100% cpu 1:24.99 total
