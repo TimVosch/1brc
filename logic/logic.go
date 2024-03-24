@@ -26,8 +26,6 @@ type Station struct {
 	Count int64
 }
 
-type StationName [100]byte
-
 const (
 	readBufferSize = 1 << 24
 	maxLineLength  = 110 // 100 name + 1 ; + 1 \n + 5 -12.3
@@ -59,8 +57,7 @@ func Run(path string) error {
 }
 
 func process(line []byte) {
-	stationName, temperatureString := Cut(line)
-	temperature := ParseTemperature(temperatureString)
+	stationName, temperature := ParseCut(line)
 	station := stationTrie.Get(stationName)
 	station.Count++
 	station.Total += int64(temperature)
@@ -109,7 +106,7 @@ func PrintTemperature(f io.Writer, value int16) {
 func PrintStation(f io.Writer, station *Station) {
 	PrintTemperature(f, station.Min)
 	f.Write([]byte{'/'})
-	PrintTemperature(f, int16(int64(station.Total)/station.Count))
+	PrintTemperature(f, int16(station.Total/station.Count))
 	f.Write([]byte{'/'})
 	PrintTemperature(f, station.Max)
 	f.Write([]byte{',', ' '})
@@ -127,6 +124,48 @@ func Max(a, b int16) int16 {
 		return b
 	}
 	return a
+}
+
+func ParseCut(str []byte) ([]byte, int16) {
+	length := len(str)
+	// Collects the latter 3 characters
+	// ??0.0
+	out := int16(str[length-1]-'0') + int16(str[length-3]-'0')*10
+
+	// ? can be a digit, negative or ;
+	switch str[length-4] {
+	case ';':
+		return str[:length-4], out
+	case '-':
+		return str[:length-5], -out
+	}
+	out += int16(str[length-4]-'0') * 100
+
+	if str[length-5] == '-' {
+		return str[:length-6], -out
+	}
+	return str[:length-5], out
+}
+
+func ParseCutN(str []byte) (int, int16) {
+	length := len(str)
+	// Collects the latter 3 characters
+	// ??0.0
+	out := int16(str[length-1]-'0') + int16(str[length-3]-'0')*10
+
+	// ? can be a digit, negative or ;
+	switch str[length-4] {
+	case ';':
+		return length - 4, out
+	case '-':
+		return length - 5, -out
+	}
+	out += int16(str[length-4]-'0') * 100
+
+	if str[length-5] == '-' {
+		return length - 6, -out
+	}
+	return length - 5, out
 }
 
 func ParseTemperature(str []byte) int16 {

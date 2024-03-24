@@ -42,6 +42,37 @@ func TestParseTemperature(t *testing.T) {
 	}
 }
 
+func TestParseCut(t *testing.T) {
+	testCases := []struct {
+		input  []byte
+		output int16
+	}{
+		{
+			input:  []byte("Eindhoven;-12.5"),
+			output: -125,
+		},
+		{
+			input:  []byte("Eindhoven;12.5"),
+			output: 125,
+		},
+		{
+			input:  []byte("Eindhoven;-2.5"),
+			output: -25,
+		},
+		{
+			input:  []byte("Eindhoven;2.5"),
+			output: 25,
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(string(tC.input), func(t *testing.T) {
+			name, temperature := logic.ParseCut(tC.input)
+			assert.EqualValues(t, tC.output, temperature)
+			assert.EqualValues(t, []byte("Eindhoven"), name)
+		})
+	}
+}
+
 func TestPrintTemperature(t *testing.T) {
 	testCases := []struct {
 		input  int16
