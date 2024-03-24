@@ -39,5 +39,6 @@ Sparse set
     - 46.39s user 1.73s system 100% cpu 48.002 total # With TrieNode pool
     - 48.77s user 1.64s system 99% cpu 50.414 total  # Removed IsValueNode and made Station a pointer
     - 46.35s user 1.65s system 100% cpu 47.983 total # Value Station instead of pointer
-## Batch read content
-    - 22.77s user 1.55s system 100% cpu 24.263 total
+## Batch read content (ERROR)
+    Unfortunately this appeared to ignore station names
+    - ~22.77s user 1.55s system 100% cpu 24.263 total~
