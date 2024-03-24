@@ -1,10 +1,18 @@
 # 1BRC Golang
-- Floating arithmetic is slow
-    - Always 1 decimal so its 10x 
 - Branches are slow
 - Keep often used memory close
     - Optimize CPU caches?
     - Use pointers
+- Or RtL and cut at the same time
+- Parse number from LtR use:
+    number
+    is more? number * 10 + newnumber
+    is more? number * 10 + newnumber
+- Min Binary Heap
+
+Max of 10000 items with a 100 byte identifier referencing a struct, to be ordered
+
+Sparse set
 
 
 # Implementations
@@ -17,3 +25,11 @@
     - 156.51s user 8.56s system 102% cpu 2:40.32 total
 ## Custom batch reader implementation
     - 82.12s user 3.40s system 100% cpu 1:24.99 total
+## Sparse Trie (invalid)
+    Missing proper sorting
+
+    The Trie uses a sparse set for its children. The idea was that the dense set is sorted and can always be 
+    read from left to right, being alphabetically sorted.
+    Where the sparse array is used to direct index the next node.
+
+    - 87.14s user 1.63s system 100% cpu 1:28.72 total
