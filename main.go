@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -10,8 +9,6 @@ import (
 	"runtime/pprof"
 	"slices"
 	"strconv"
-	"strings"
-	"time"
 )
 
 var (
@@ -22,7 +19,7 @@ var (
 func main() {
 	flag.Parse()
 	if *cpuprofile {
-		f, err := os.Create("profiles/" + time.Now().Format("200601021504") + ".pprof")
+		f, err := os.Create("cpu.pprof")
 		if err != nil {
 			log.Fatal("could not create CPU profile: ", err)
 		}
@@ -57,19 +54,35 @@ type Station struct {
 	Count int64
 }
 
-func Run() error {
-	stations := make(map[string]Station, 10000)
+const (
+	readBufferSize    = 1 << 24
+	maxInLinesChannel = 100
+	maxLineLength     = 110 // 100 name + 1 ; + 1 \n + 5 -12.3
+	batchSize         = 100
+)
 
-	file, err := os.Open(*measurementsPath)
-	if err != nil {
-		return err
-	}
+type (
+	Payload []byte
+	Batch   [batchSize]Payload
+)
+
+var (
+	stations     = make(map[string]Station, 10000)
+	stationNames = make([]string, 10000)
+	linesChannel = make(chan *[]byte, maxInLinesChannel)
+)
+
+func Run() error {
+	go readContents()
 
 	// Process
-	scan := bufio.NewScanner(file)
-	for scan.Scan() {
-		line := scan.Text()
-		stationName, temperatureString, _ := strings.Cut(line, ";")
+	for {
+		line, ok := <-linesChannel
+		if !ok {
+			break
+		}
+		stationNameB, temperatureString := Cut((*line)[:])
+		stationName := string(stationNameB)
 		temperature := ParseTemperature(temperatureString)
 		station, ok := stations[stationName]
 		if !ok {
@@ -88,11 +101,10 @@ func Run() error {
 		}
 		stations[stationName] = station
 	}
-	file.Close()
 
 	// Sort stationNames
-	stationNames := make([]string, len(stations))
 	ix := 0
+	stationNames = stationNames[:len(stations)]
 	for stationName := range stations {
 		stationNames[ix] = stationName
 		ix++
@@ -100,7 +112,7 @@ func Run() error {
 	slices.Sort(stationNames)
 
 	// Output
-	file, _ = os.OpenFile("output.txt", os.O_CREATE|os.O_WRONLY, 644)
+	file, _ := os.Create("output.txt")
 	file.Write([]byte("{"))
 	for _, stationName := range stationNames {
 		file.Write([]byte(stationName + "="))
@@ -113,6 +125,40 @@ func Run() error {
 	return nil
 }
 
+func readContents() {
+	file, _ := os.Open(*measurementsPath)
+	var lineStart, lineEnd, n int
+	var tail int
+	buffer := make([]byte, readBufferSize)
+	n, _ = file.Read(buffer)
+	for n > 0 {
+		for tail = 0; buffer[n-tail-1] != '\n'; tail++ {
+		}
+
+		for lineStart = 0; lineStart < n-tail; {
+			for lineEnd = lineStart; buffer[lineEnd] != '\n'; lineEnd++ {
+			}
+			line := make([]byte, lineEnd-lineStart)
+			copy(line[:], buffer[lineStart:lineEnd])
+			linesChannel <- &line
+			lineStart = lineEnd + 1
+		}
+
+		copy(buffer, buffer[n-tail:n])
+		n, _ = file.Read(buffer[tail:])
+		n += tail
+	}
+	file.Close()
+	close(linesChannel)
+}
+
+func Cut(line []byte) ([]byte, []byte) {
+	var i int
+	for i = len(line) - 3; line[i] != ';'; i-- {
+	}
+	return line[:i], line[i+1:]
+}
+
 func PrintTemperature(f io.Writer, value int16) {
 	str := []byte(strconv.Itoa(int(value)))
 	str = append(str, str[len(str)-1])
@@ -122,9 +168,11 @@ func PrintTemperature(f io.Writer, value int16) {
 
 func PrintStation(f io.Writer, station Station) {
 	PrintTemperature(f, station.Min)
-	f.Write([]byte{'/', ' '})
+	f.Write([]byte{'/'})
 	PrintTemperature(f, int16(int64(station.Total)/station.Count))
+	f.Write([]byte{'/'})
 	PrintTemperature(f, station.Max)
+	f.Write([]byte{',', ' '})
 }
 
 func Min(a, b int16) int16 {
@@ -141,35 +189,7 @@ func Max(a, b int16) int16 {
 	return a
 }
 
-// __0 1 2 3 4
-//   - 1 2 . 3
-//     1 2 . 3
-//   - 2 . 3
-//     2 . 3
-//func ParseTemperature2(str string) int16 {
-//	var out int16
-//	chars := []byte(str)
-//	end := len(chars) - 1
-//	// These three characters are always the same digit dot digit
-//	out += int16((chars[end] - 0x30))
-//	// out += int16((chars[end-1] - 0x30) * 10) // ignore '.'
-//	out += int16((chars[end-2] - 0x30) * 10)
-//	if end-3 < 0 {
-//		return out
-//	}
-//	// The following digits are optional: ( [negation + digit] | [negation | digit] )
-//	if chars[end-3] == '-' {
-//		return out * -1
-//	}
-//	out += int16((chars[end-3] - 0x30) * 100)
-//	if end-4 >= 0 && chars[end-4] == '-' {
-//		return out * -1
-//	}
-//
-//	return out
-//}
-
-func ParseTemperature(str string) int16 {
+func ParseTemperature(str []byte) int16 {
 	length := len(str)
 	out := int16(str[length-1]-'0') + int16(str[length-3]-'0')*10
 
